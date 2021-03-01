@@ -15,6 +15,34 @@ library("ggplot2")
 library("plotly")
 library("scales")
 
+# --- data loading
+deaths <- read_csv(
+    file = "./data/NYC-death-causes.csv",
+    col_types = cols(
+        Year = col_double(),
+        Deaths = col_double(),
+        `Death Rate` = col_double(),
+        `Age Adjusted Death Rate` = col_double(),
+        .default = col_character()
+    )
+)
+
+names(deaths) <- str_replace_all(names(deaths), pattern = " ", "")
+
+deaths <- deaths %>% 
+    filter(!is.na(Deaths)) %>% 
+    mutate(
+        LeadingCause = str_replace_all(
+            LeadingCause, 
+            pattern = "Posioning",
+            replacement = "Poisoning"),
+        LeadingCause = gsub("\\(..*", "", LeadingCause),
+        LeadingCause = str_trim(LeadingCause),
+        Sex = case_when(Sex == "F" ~ "Female",
+                        Sex == "M" ~ "Male",
+                        TRUE ~ Sex)
+    )
+
 # --- split the components expected by the app for readability
 
 header <- dashboardHeader(
