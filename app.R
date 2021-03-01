@@ -3,6 +3,7 @@ library("shiny")
 library("shinydashboard")
 library("dashboardthemes")
 library("DT")
+library("rhandsontable")
 
 # for data loading and transformation
 library("readr")
@@ -16,8 +17,8 @@ library("ggplot2")
 library("plotly")
 library("scales")
 
-my_pal <- c("#f72585", "#b5179e", "#7209b7", "#560bad", "#480ca8",
-            "#3a0ca3", "#3f37c9", "#4361ee", "#4895ef", "#4cc9f0")
+my_pal <- c("#7400b8", "#6930c3", "#5e60ce", "#5390d9", "#4ea8de",
+            "#48bfe3", "#56cfe1", "#64dfdf", "#72efdd", "#80ffdb")
 
 # --- data loading
 deaths <- read_csv(
@@ -39,6 +40,7 @@ fix_numbers <- function(x) {
 }
 
 deaths <- deaths %>% 
+    rename(Ethnicity = RaceEthnicity) %>% 
     mutate(
         LeadingCause = str_replace_all(
             LeadingCause, 
@@ -103,12 +105,6 @@ body <- dashboardBody(
     
     # first row
     fluidRow(
-        # these are the main plots: trend comparison for different leading causes
-        column(
-            width = 3,
-            box(width = 12, status = "warning")
-        ),
-        
         # this column includes the global filter for the page (leading case) and a pie-chart
         column(
             width = 3,
@@ -136,12 +132,12 @@ body <- dashboardBody(
         
         # Descriptive information for total number of deaths
         column(
-            width = 6,
+            width = 9,
             fluidRow(
                 # for dynamic info boxes:infoBoxOutput
-                infoBox("total_deaths", color = "aqua"),
-                infoBox("average_deaths", color = "aqua"),
-                infoBox("average_rate", color = "aqua")
+                infoBox("total_deaths", color = "purple"),
+                infoBox("average_deaths", color = "purple"),
+                infoBox("average_rate", color = "purple")
             ),
             
             tabBox(
@@ -151,6 +147,13 @@ body <- dashboardBody(
                 tabPanel(
                     title = "Total Deaths", 
                     icon = icon("chart-bar"),
+                    radioButtons(
+                        inputId = "demographics", 
+                        label = "Select one:", 
+                        choices = c("All", "Sex", "Ethnicity"), 
+                        selected = "All", 
+                        inline = TRUE
+                    ),
                     plotlyOutput(outputId = "total_deaths", height = "80%")
                 ),
                 
@@ -164,20 +167,34 @@ body <- dashboardBody(
         column(
             width = 6,
             
-            box(width = 12),
+            box(
+                width = 12,
+                plotlyOutput(outputId = "women_men_ratio", height = "80%")
+            ),
             
             tabBox(
                 width = 12,
                 side = "left", height = "250px",
                 selected = "Sex",
-                tabPanel("Sex", "Tab content 1", icon = icon("venus-mars")),
-                tabPanel("Ethnicity", "Tab content 2", icon = icon("globe-americas"))
+                tabPanel(
+                    title = "Sex", 
+                    icon = icon("venus-mars"),
+                    plotlyOutput(outputId = "boxplots1", height = "80%")
+                ),
+                tabPanel(
+                    title = "Ethnicity", 
+                    icon = icon("globe-americas"),
+                    plotlyOutput(outputId = "boxplots2", height = "80%")
+                )
             ),
         ),
         
         column(
             width = 6,
-            box()
+            box(
+                width = 12,
+                plotlyOutput(outputId = "lollipops", height = "80%")
+            )
         )
     )
 )
@@ -233,30 +250,64 @@ server <- function(input, output, session){
     
     total_deaths_df <- reactive({
         req(input$cause)
+        req(input$demographics)
+        
+        # when there is no filter (i.e., choice "All"), I choose all the leading causes
+        # so basically, no filter is done
         
         if(input$cause == "All"){
-            cause <- leading_causes$LeadingCause
+            cause <- deaths$LeadingCause
         } else {
             cause <- input$cause
         }
         
-        deaths %>% 
-            filter(LeadingCause %in% cause) %>% 
-            group_by(Year, Sex) %>% 
+        df <- deaths %>% 
+            filter(LeadingCause %in% cause)
+        
+        # when there is no demographic variable selected, I group only by year
+        if(input$demographics == "All"){
+            
+            df <- df %>% 
+                group_by(Year)
+                
+        } else {
+            # otherwise, I use the corresponding column
+            df <- df %>% 
+                rename(var = !!sym(input$demographics)) %>% 
+                group_by(Year, var)
+        }
+        
+        df %>% 
             summarise(Deaths = sum(Deaths), 
                       .groups = "drop")
+        
     })
     
     output$total_deaths <- renderPlotly({
-        total_deaths_df() %>% 
-            plot_ly(
-                x = ~Year, 
-                y = ~Deaths, 
-                color = ~Sex, 
-                height = 260,
-                type = "bar",
-                colors = my_pal
-            ) %>% 
+        
+        # when the user selects "All" (default), I need to change the color argument
+        if(input$demographics == "All"){
+            fig <- total_deaths_df() %>% 
+                plot_ly(
+                    x = ~Year, 
+                    y = ~Deaths, 
+                    height = 200,
+                    type = "bar",
+                    marker = list(color = my_pal[10])
+                )
+        } else {
+            fig <- total_deaths_df() %>% 
+                plot_ly(
+                    x = ~Year, 
+                    y = ~Deaths, 
+                    color = ~var, # no color argument for "All"
+                    height = 200,
+                    type = "bar",
+                    colors = my_pal
+                )
+        }
+        
+         fig %>% 
             layout(
                 margin = list(l = 10, r = 10, t = 10, b = 10),
                 plot_bgcolor  = "rgba(0, 0, 0, 0)",
