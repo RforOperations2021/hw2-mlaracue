@@ -134,10 +134,10 @@ body <- dashboardBody(
         column(
             width = 9,
             fluidRow(
-                # for dynamic info boxes:infoBoxOutput
-                infoBox("total_deaths", color = "purple"),
-                infoBox("average_deaths", color = "purple"),
-                infoBox("average_rate", color = "purple")
+                # for dynamic info boxes
+                infoBoxOutput(outputId = "total_deaths"),
+                infoBoxOutput(outputId = "average_deaths"),
+                infoBoxOutput(outputId = "average_rate")
             ),
             
             tabBox(
@@ -157,7 +157,7 @@ body <- dashboardBody(
                     plotlyOutput(outputId = "total_deaths", height = "80%")
                 ),
                 
-                tabPanel("Data", "Tab content 2", icon = icon("table"))
+                tabPanel("Data", DTOutput("table1"), icon = icon("table"))
             ),
         )
     ),
@@ -165,11 +165,20 @@ body <- dashboardBody(
     # second row
     fluidRow(
         column(
-            width = 6,
+            width = 8,
             
-            box(
+            tabBox(
                 width = 12,
-                plotlyOutput(outputId = "women_men_ratio", height = "80%")
+                side = "left", height = "250px",
+                selected = "Female / Male Deaths Ratio",
+                tabPanel(
+                    title = "Female / Male Deaths Ratio", 
+                    icon = icon("venus-mars"),
+                    plotlyOutput(outputId = "women_men_ratio", height = "80%")
+                ),
+                
+                tabPanel(title = "Data", DTOutput("table2"), icon = icon("table")
+                )
             ),
             
             tabBox(
@@ -179,19 +188,20 @@ body <- dashboardBody(
                 tabPanel(
                     title = "Sex", 
                     icon = icon("venus-mars"),
-                    plotlyOutput(outputId = "boxplots1", height = "80%")
+                    plotlyOutput(outputId = "boxplot1", height = "80%")
                 ),
                 tabPanel(
                     title = "Ethnicity", 
                     icon = icon("globe-americas"),
-                    plotlyOutput(outputId = "boxplots2", height = "80%")
+                    plotlyOutput(outputId = "boxplot2", height = "80%")
                 )
             ),
         ),
         
         column(
-            width = 6,
+            width = 4,
             box(
+                title = "Average Deaths Rates by Year and Sex",
                 width = 12,
                 plotlyOutput(outputId = "lollipops", height = "80%")
             )
@@ -248,9 +258,8 @@ server <- function(input, output, session){
             )
     })
     
-    total_deaths_df <- reactive({
+    deaths_filtered <- reactive({
         req(input$cause)
-        req(input$demographics)
         
         # when there is no filter (i.e., choice "All"), I choose all the leading causes
         # so basically, no filter is done
@@ -261,18 +270,32 @@ server <- function(input, output, session){
             cause <- input$cause
         }
         
-        df <- deaths %>% 
+        deaths %>% 
             filter(LeadingCause %in% cause)
+    })
+    
+    # output$total_deaths <- renderInfoBox({
+    #     infoBox(
+    #         title = "Progress",
+    #         value = paste0(25 + input$count, "%"), 
+    #         icon = icon("list"),
+    #         color = "purple"
+    #     )
+    # })
+    
+    total_deaths_df <- reactive({
+        
+        req(input$demographics)
         
         # when there is no demographic variable selected, I group only by year
         if(input$demographics == "All"){
             
-            df <- df %>% 
+            df <- deaths_filtered() %>% 
                 group_by(Year)
-                
+            
         } else {
             # otherwise, I use the corresponding column
-            df <- df %>% 
+            df <- deaths_filtered() %>% 
                 rename(var = !!sym(input$demographics)) %>% 
                 group_by(Year, var)
         }
@@ -307,7 +330,8 @@ server <- function(input, output, session){
                 )
         }
         
-         fig %>% 
+        # layout enhancement
+        fig %>% 
             layout(
                 margin = list(l = 10, r = 10, t = 10, b = 10),
                 plot_bgcolor  = "rgba(0, 0, 0, 0)",
@@ -315,6 +339,166 @@ server <- function(input, output, session){
                 font = list(color = '#FFFFFF', size = 10)
             )
         
+    })
+    
+    output$table1 <- renderDT(
+        total_deaths_df(),
+        options = list(pageLength = 4, dom = 'ftip')
+    )
+    
+    women_men_ratio_df <- reactive({
+        
+        # fir this df, I have to transform the data from wide to long
+        # and then get both the ratio and the sum of total deaths
+        # the rows where the # of deaths is zero are eliminated
+        
+        deaths_filtered() %>% 
+            select(-DeathRate, -AgeAdjustedDeathRate) %>% 
+            spread(key = Sex, value = Deaths, fill = 0) %>% 
+            filter(Male != 0, Female != 0) %>%
+            rowwise() %>% 
+            mutate(ratio = Female / Male,
+                   Deaths = Female + Male) %>% 
+            group_by(Year, Ethnicity) %>% 
+            summarise(
+                ratio = mean(ratio), 
+                Deaths = sum(Deaths),
+                .groups = "drop"
+            )
+    })
+    
+    output$women_men_ratio <- renderPlotly(
+        
+        women_men_ratio_df() %>% 
+            plot_ly(
+                x = ~Year, 
+                y = ~ratio, 
+                color = ~Ethnicity, 
+                size = ~Deaths, 
+                colors = my_pal,
+                type = 'scatter', 
+                mode = 'markers', 
+                height = 200,
+                sizes = c(10, 60),
+                marker = list(
+                    symbol = 'circle', 
+                    sizemode = 'diameter',
+                    line = list(width = 2, color = '#FFFFFF')
+                ),
+                text = ~paste(
+                    'Year:', Year,
+                    '<br>Ratio:', round(ratio, 2),
+                    '<br>Total Deaths:', comma(Deaths)
+                )
+            ) %>% 
+            layout(
+                margin = list(l = 10, r = 10, t = 10, b = 10),
+                plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                paper_bgcolor = "rgba(0, 0, 0, 0)",
+                font = list(color = '#FFFFFF', size = 10),
+                legend = list(x = 0.8, y = 0.05),
+                xaxis = list(showgrid = F)
+            )
+    )
+    
+    output$table2 <- renderDT(
+        women_men_ratio_df() %>% mutate(ratio = round(ratio, 2)),
+        options = list(pageLength = 4, dom = 'ftip')
+    )
+    
+    output$boxplot1 <- renderPlotly({
+        
+        deaths_filtered() %>% 
+            plot_ly(
+                x = ~Deaths, 
+                type = "box",
+                color = ~Sex,
+                colors = my_pal[c(1, 10)],
+                height = 200
+            ) %>% 
+            layout(
+                margin = list(l = 10, r = 10, t = 10, b = 10),
+                plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                paper_bgcolor = "rgba(0, 0, 0, 0)",
+                font = list(color = '#FFFFFF', size = 10),
+                legend = list(x = 0.8, y = 0.05),
+                xaxis = axis_template
+            )
+        
+    })
+    
+    output$boxplot2 <- renderPlotly({
+        
+        deaths_filtered() %>% 
+            plot_ly(
+                x = ~Deaths, 
+                type = "box",
+                color = ~Ethnicity,
+                colors = my_pal,
+                height = 200
+            ) %>% 
+            layout(
+                margin = list(l = 10, r = 10, t = 10, b = 10),
+                plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                paper_bgcolor = "rgba(0, 0, 0, 0)",
+                font = list(color = '#FFFFFF', size = 10),
+                legend = list(x = 0.8, y = 0.05),
+                xaxis = axis_template
+            )
+        
+    })
+    
+    
+    output$lollipops <- renderPlotly({
+        
+        # I get an average of death rates by year and sex (accounting for ethnicities)
+        lollipop_df <- deaths_filtered() %>%
+            group_by(Year, Sex) %>% 
+            summarise(DeathRate = mean(DeathRate, na.rm = TRUE),
+                      .groups = "drop") %>% 
+            ungroup()
+        
+        # first trace
+        fig <- plot_ly(
+            data = lollipop_df %>% filter(Sex == "Female"),
+            x = ~DeathRate, 
+            y = ~Year, 
+            name = "Women", 
+            type = 'scatter',
+            mode = "lines+markers", 
+            marker = list(color = my_pal[1], size = 10),
+            line = list(color = my_pal[1]),
+            height = 500
+        )
+        
+        # second trace
+        fig <- fig %>% 
+            add_trace(
+                data = lollipop_df %>% filter(Sex == "Male"),
+                x = ~DeathRate, 
+                y = ~Year, 
+                name = "Men", 
+                type = 'scatter',
+                mode = "lines+markers", 
+                marker = list(color = my_pal[10], size = 10), 
+                line = list(color = my_pal[10])
+            )
+        
+        # layout enhancement
+        fig <- fig %>% 
+            layout(
+                margin = list(l = 10, r = 10, t = 10, b = 10),
+                plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                paper_bgcolor = "rgba(0, 0, 0, 0)",
+                font = list(color = '#FFFFFF', size = 10),
+                legend = list(x = 0.8, y = 0.05),
+                yaxis = list(showgrid = F),
+                xaxis = list(
+                    dtick = 5, 
+                    tick0 = 0, 
+                    tickmode = "linear"
+                )
+            )
     })
 }
 
