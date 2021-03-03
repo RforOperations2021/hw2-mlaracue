@@ -127,10 +127,31 @@ body <- dashboardBody(
         column(
             width = 9,
             fluidRow(
-                # for dynamic info boxes
-                infoBoxOutput(outputId = "total_deaths"),
-                infoBoxOutput(outputId = "average_deaths"),
-                infoBoxOutput(outputId = "average_rate")
+                # static boxes
+                infoBox(
+                    title = "Total No. Deaths",
+                    value = comma(sum(deaths$Deaths), digits = 0),
+                    icon = icon("calculator"),
+                    color = "purple"
+                ),
+                
+                infoBox(
+                    title = "Average No. Deaths",
+                    value = comma(mean(deaths$Deaths), digits = 2),
+                    icon = icon("balance-scale"),
+                    color = "purple"
+                ),
+                
+                infoBox(
+                    title = "Average Rate of Death",
+                    value = comma(mean(deaths$DeathRate), digits = 2),
+                    icon = icon("percentage"),
+                    color = "purple"
+                ),
+                # for dynamic info boxes (not working!)
+                # infoBoxOutput(outputId = "total_deaths")
+                # infoBoxOutput(outputId = "average_deaths"),
+                # infoBoxOutput(outputId = "average_rate")
             ),
             
             tabBox(
@@ -212,7 +233,7 @@ server <- function(input, output, session){
         showticklabels = FALSE
     )
     
-    # pie chart with death leading causes' relative frequencies
+    # -- pie that shows the relative frequency of each leading cause, dynamic colors.
     output$pie <- renderPlotly({
         
         colors <- to_vec(
@@ -251,6 +272,7 @@ server <- function(input, output, session){
             )
     })
     
+    # -- reactive object to filter the leading cause (global filter for the page)
     deaths_filtered <- reactive({
         req(input$cause)
         
@@ -267,14 +289,15 @@ server <- function(input, output, session){
             filter(LeadingCause %in% cause)
     })
     
-    # output$total_deaths <- renderInfoBox({
-    #     infoBox(
-    #         title = "Progress",
-    #         value = paste0(25 + input$count, "%"), 
-    #         icon = icon("list"),
-    #         color = "purple"
-    #     )
-    # })
+    # infobox 1: sum of Deaths columns from filtered df (global)
+    output$total_deaths <- renderInfoBox({
+        infoBox(
+            title = "Total No. Deaths",
+            value = comma(sum(deaths_filtered()$Deaths), digits = 0),
+            icon = icon("calculator"),
+            color = "purple"
+        )
+    })
     
     total_deaths_df <- reactive({
         
@@ -494,6 +517,5 @@ server <- function(input, output, session){
             )
     })
 }
-
 
 shinyApp(ui = ui, server = server)
