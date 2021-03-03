@@ -22,6 +22,7 @@ my_pal <- c("#7400b8", "#6930c3", "#5e60ce", "#5390d9", "#4ea8de",
 
 # --- data loading
 deaths <- read_csv(
+    na = ".",
     file = "./data/NYC-death-causes.csv",
     col_types = cols(
         Year = col_double(),
@@ -30,14 +31,6 @@ deaths <- read_csv(
 )
 
 names(deaths) <- str_replace_all(names(deaths), pattern = " ", "")
-
-fix_numbers <- function(x) {
-    if (x == ".") {
-        return(NA_real_)
-    } else {
-        return(as.numeric(x))
-    }
-}
 
 deaths <- deaths %>% 
     rename(Ethnicity = RaceEthnicity) %>% 
@@ -54,7 +47,7 @@ deaths <- deaths %>%
     ) %>% 
     mutate_at(
         .vars = c("Deaths", 'DeathRate', "AgeAdjustedDeathRate"),
-        .funs = fix_numbers
+        .funs = as.numeric
     ) %>% 
     filter(!is.na(Deaths), Deaths > 5)
 
