@@ -3,7 +3,6 @@ library("shiny")
 library("shinydashboard")
 library("dashboardthemes")
 library("DT")
-library("rhandsontable")
 
 # for data loading and transformation
 library("readr")
@@ -70,6 +69,8 @@ sidebar <- dashboardSidebar(
     
     # the app has three main pages: EDA, hypothesis testing and forecasting
     sidebarMenu(
+        id = "mymenu",
+        
         menuItem(
             "Exploratory Data Analysis", 
             tabName = "EDA", 
@@ -88,66 +89,80 @@ sidebar <- dashboardSidebar(
             tabName = "forecasting", 
             icon = icon("diagnoses")
         )
+    ),
+    
+    hr(),
+    
+    selectInput(
+        inputId = "cause",
+        label = "Select a leading cause:",
+        choices = c("All", leading_causes$LeadingCause),
+        selected = 'All',
+        multiple = FALSE, 
+        width = '400px'
     )
+    
 )
 
-body <- dashboardBody(
-    shinyDashboardThemes(
-        theme = "purple_gradient"
-    ),
+EDA <- tabItem(
+    tabName = "EDA",
+    
+    h2("Exploratory Data Analysis"),
     
     # first row
     fluidRow(
         # this column includes the global filter for the page (leading case) and a pie-chart
         column(
             width = 3,
-            box(
-                width = 12, 
-                status = "primary", 
-                title = "Global Filter",
-                selectInput(
-                    inputId = "cause", 
-                    label = "Select a leading cause (optional)", 
-                    choices = c("All", leading_causes$LeadingCause),
-                    selected = 'All', 
-                    multiple = FALSE
-                )
-            ),
             
             # pie-chart with leading causes' relative frequencies
             box(
                 width = 12, 
                 status = "primary", 
                 title = "Leading Cause Pie-Chart",
-                plotlyOutput(outputId = "pie", height = "80%")
+                plotlyOutput(outputId = "pie", height = "100%")
             )
         ),
+        
+        tags$style(".small-box {height: 80px}"),
         
         # Descriptive information for total number of deaths
         column(
             width = 9,
             fluidRow(
                 # static boxes
-                infoBox(
-                    title = "Total No. Deaths",
-                    value = comma(sum(deaths$Deaths), digits = 0),
-                    icon = icon("calculator"),
+                valueBox(
+                    subtitle = "Total No. Deaths",
+                    value = tags$p(comma(sum(deaths$Deaths), accuracy = 1), 
+                                   style = "font-size: 80%"),
+                    icon = tags$i(
+                        class = "fas fa-calculator", 
+                        style = "font-size: 40px; color: white; position:relative; right:25px;"
+                    ),
                     color = "purple"
                 ),
                 
-                infoBox(
-                    title = "Average No. Deaths",
-                    value = comma(mean(deaths$Deaths), digits = 2),
-                    icon = icon("balance-scale"),
+                valueBox(
+                    subtitle = "Average No. Deaths",
+                    value = tags$p(comma(mean(deaths$Deaths), accuracy = 0.1), 
+                                   style = "font-size: 80%;"),
+                    icon = tags$i(
+                        class = "fas fa-balance-scale", 
+                        style = "font-size: 40px; color: white; position:relative; right:25px;"
+                    ),
                     color = "purple"
                 ),
                 
-                infoBox(
-                    title = "Average Rate of Death",
-                    value = comma(mean(deaths$DeathRate), digits = 2),
-                    icon = icon("percentage"),
+                valueBox(
+                    subtitle = "Average Rate of Death",
+                    value = tags$p(comma(mean(deaths$DeathRate, na.rm = TRUE), accuracy = 0.01), 
+                                   style = "font-size: 80%;"),
+                    icon = tags$i(
+                        class = "fas fa-percentage", 
+                        style = "font-size: 40px; color: white; position:relative; right:25px;"
+                    ),
                     color = "purple"
-                ),
+                )
                 # for dynamic info boxes (not working!)
                 # infoBoxOutput(outputId = "total_deaths")
                 # infoBoxOutput(outputId = "average_deaths"),
@@ -223,10 +238,100 @@ body <- dashboardBody(
     )
 )
 
+hypothesis_testing <- tabItem(
+    tabName = "testing",
+    
+    h2("Hypothesis Testing"),
+    
+    fluidRow(
+        column(
+            width = 4,
+            
+            box(
+                width = 12,
+                
+                h4("Demograhpics"),
+                
+                br(),
+                
+                radioButtons(
+                    inputId = "demographics2", 
+                    label = "Select one:", 
+                    choices = c("Sex", "Ethnicity"), 
+                    selected = "Sex", 
+                    inline = TRUE
+                ),
+                
+                # -- groups 1 and 2 are conditional on input 'demographics2'
+                uiOutput(outputId = "group1"),
+                uiOutput(outputId = "group2"),
+                
+                hr(),
+                
+                h4("Hypothesis Parameters"),
+                
+                br(),
+                
+                numericInput(
+                    inputId = "alpha", 
+                    label = "Significance level:", 
+                    value = .05,
+                    min = 0,
+                    max = 0.1, 
+                    step = .01
+                ),
+                
+                selectInput(
+                    inputId = "test_type", 
+                    label = "Type of test:", 
+                    choices = c("two.sided", "less", "greater")
+                )
+            )
+        ),
+        
+        column(
+            width = 8,
+            
+            # -- main plot (i.e., density distributions)
+            fluidRow(
+                
+                box(
+                    width = 12,
+                    title = "Distribution Differences", 
+                    status = "primary",
+                    
+                    plotlyOutput(outputId = "densities")
+                )
+            ),
+            
+            # -- auxiliary tables (summary statistics and test results)
+            fluidRow(
+                column(width = 8, DTOutput(outputId = "statistics")),
+                column(width = 4, DTOutput(outputId = "test_results"))
+            )
+        )
+    )
+)
+
+forecasting <- tabItem(
+    tabName = "forecasting",
+    
+    h2("Forecasting")
+)
+
+body <- dashboardBody(
+    shinyDashboardThemes(
+        theme = "purple_gradient"
+    ),
+    
+    tabItems(EDA, hypothesis_testing, forecasting)
+)
+
 ui <- dashboardPage(header, sidebar, body)
 
 server <- function(input, output, session){
     
+    # --- EDA module ---
     axis_template <- list(
         showgrid = FALSE, 
         zeroline = FALSE, 
@@ -252,7 +357,7 @@ server <- function(input, output, session){
             plot_ly(
                 labels = ~LeadingCause, 
                 values = ~wt,
-                height = 200,
+                height = 350,
                 textposition = 'inside',
                 textinfo = 'percent',
                 hoverinfo = 'label',
@@ -484,7 +589,7 @@ server <- function(input, output, session){
             mode = "lines+markers", 
             marker = list(color = my_pal[1], size = 10),
             line = list(color = my_pal[1]),
-            height = 500
+            height = 470
         )
         
         # second trace
@@ -516,6 +621,100 @@ server <- function(input, output, session){
                 )
             )
     })
+    
+    # --- Hypothesis Testing module ---
+    
+    # -- dynamic choices for group 1 and 2
+    dem_choices <- reactive({
+        req(input$demographics2)
+        deaths %>%pull(!!sym(input$demographics2)) %>% unique() %>% sort()
+    })
+    
+    output$group1 <- renderUI(
+        selectInput(
+            inputId = "group1",
+            label = "Select comparison group 1:",
+            choices = dem_choices()
+        )
+    )
+    
+    # -- an user cannot select the same group for both (group 1 and group 2)
+    # So I take out the group selected in input$group1
+    output$group2 <- renderUI({
+        req(input$group1)
+        
+        selectInput(
+            inputId = "group2",
+            label = "Select comparison group 2:",
+            choices = dem_choices()[dem_choices() != input$group1]
+        )
+    })
+    
+    # -- here I update the maximum value permitted for significance level
+    observe({
+        req(input$alpha)
+        
+        if(input$alpha > 0.1 | input$alpha < 0){
+            updateNumericInput(
+                session = session,
+                inputId = "alpha",
+                value = 0.1
+            )
+        }
+    })
+    
+    test_opts <- reactiveValues(
+        groups = c(input$group1, input$group2),
+        confidence = 1 - input$alpha,
+        type = input$test_type
+    )
+
+    # test_df <- reactive({
+    #     req(input$demographics2)
+    #     deaths %>% 
+    #         rename(var = !!sym(input$demographics2)) %>% 
+    #         filter(var %in% test_opts()$groups) %>% 
+    #         select(var, Deaths)
+    # })
+    # 
+    # # -- density plot for groups 1 and 2
+    # output$densities <- renderPlotly({
+    #     
+    #     one <- test_df()[which(test_df()$var == test_opts()$groups[1]),]
+    #     density1 <- density(one$Deaths)
+    #     
+    #     two <- test_df()[which(test_df()$var == test_opts()$groups[2]),]
+    #     density2 <- density(two$Deaths)
+    #     
+    #     plot_ly(
+    #         x = ~density1$x, 
+    #         y = ~density1$y, 
+    #         type = 'scatter', 
+    #         mode = 'none', 
+    #         name = test_opts()$groups[1], 
+    #         fill = 'tozeroy',
+    #         fillcolor = my_pal[1]
+    #     ) %>% 
+    #         add_trace(
+    #             x = ~density2$x, 
+    #             y = ~density2$y, 
+    #             name = test_opts()$groups[2], 
+    #             fill = 'tozeroy',
+    #             fillcolor =  my_pal[10]
+    #         ) %>% layout(
+    #             xaxis = axis_template,
+    #             yaxis = list(title = 'Density')
+    #         )
+    # })
+    # 
+    # results <- reactive({
+    #     t.test(
+    #         Deaths ~ var, 
+    #         data = test_df(), 
+    #         alternative = test_opts()$type, 
+    #         conf.level = test_opts()$confidence
+    #     )
+    # })
 }
 
 shinyApp(ui = ui, server = server)
