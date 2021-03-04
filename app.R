@@ -663,49 +663,59 @@ server <- function(input, output, session){
         }
     })
     
-    test_opts <- reactiveValues(
-        groups = c(input$group1, input$group2),
-        confidence = 1 - input$alpha,
-        type = input$test_type
+    # test_opts <- reactiveValues({
+    #     groups = c(input$group1, input$group2),
+    #     confidence = 1 - input$alpha,
+    #     type = input$test_type
+    # })
+    
+    groups <- reactive(
+        c(input$group1, input$group2)
     )
 
-    # test_df <- reactive({
-    #     req(input$demographics2)
-    #     deaths %>% 
-    #         rename(var = !!sym(input$demographics2)) %>% 
-    #         filter(var %in% test_opts()$groups) %>% 
-    #         select(var, Deaths)
-    # })
-    # 
+    test_df <- reactive({
+        req(input$demographics2)
+        deaths_filtered() %>%
+            rename(var = !!sym(input$demographics2)) %>%
+            filter(var %in% groups()) %>%
+            select(var, Deaths)
+    })
+    
     # # -- density plot for groups 1 and 2
-    # output$densities <- renderPlotly({
-    #     
-    #     one <- test_df()[which(test_df()$var == test_opts()$groups[1]),]
-    #     density1 <- density(one$Deaths)
-    #     
-    #     two <- test_df()[which(test_df()$var == test_opts()$groups[2]),]
-    #     density2 <- density(two$Deaths)
-    #     
-    #     plot_ly(
-    #         x = ~density1$x, 
-    #         y = ~density1$y, 
-    #         type = 'scatter', 
-    #         mode = 'none', 
-    #         name = test_opts()$groups[1], 
-    #         fill = 'tozeroy',
-    #         fillcolor = my_pal[1]
-    #     ) %>% 
-    #         add_trace(
-    #             x = ~density2$x, 
-    #             y = ~density2$y, 
-    #             name = test_opts()$groups[2], 
-    #             fill = 'tozeroy',
-    #             fillcolor =  my_pal[10]
-    #         ) %>% layout(
-    #             xaxis = axis_template,
-    #             yaxis = list(title = 'Density')
-    #         )
-    # })
+    output$densities <- renderPlotly({
+        
+        one <- test_df()[which(test_df()$var == groups()[1]),]
+        # use of isolate to avoid dependency on inputs so no errors are shown
+        density1 <- isolate(density(one$Deaths)) 
+
+        two <- test_df()[which(test_df()$var == groups()[2]),]
+        density2 <- isolate(density(two$Deaths))
+
+        plot_ly(
+            x = ~density1$x,
+            y = ~density1$y,
+            type = 'scatter',
+            mode = 'none',
+            name = groups()[1],
+            fill = 'tozeroy',
+            fillcolor = "rgb(116, 0, 184, 0.1)",
+        ) %>%
+            add_trace(
+                x = ~density2$x,
+                y = ~density2$y,
+                name = groups()[2],
+                fill = 'tozeroy',
+                fillcolor =  my_pal[10],
+                opacity = .5
+            ) %>% layout(
+                xaxis = list(title = ''),
+                yaxis = list(title = 'Density'),
+                margin = list(l = 10, r = 10, t = 10, b = 10),
+                plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                paper_bgcolor = "rgba(0, 0, 0, 0)",
+                font = list(color = '#FFFFFF', size = 10)
+            )
+    })
     # 
     # results <- reactive({
     #     t.test(
