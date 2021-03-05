@@ -9,7 +9,7 @@ library("readr")
 library("tidyr")
 library("dplyr")
 library("stringr")
-library("comprehenr")
+library("broom")
 
 # for plotting
 library("ggplot2")
@@ -285,6 +285,11 @@ hypothesis_testing <- tabItem(
                     inputId = "test_type", 
                     label = "Type of test:", 
                     choices = c("two.sided", "less", "greater")
+                ),
+                
+                actionButton(
+                    inputId = "go",
+                    label = "Analyze"
                 )
             )
         ),
@@ -668,48 +673,40 @@ server <- function(input, output, session){
         }
     })
     
-    # test_opts <- reactiveValues({
-    #     groups = c(input$group1, input$group2),
-    #     confidence = 1 - input$alpha,
-    #     type = input$test_type
-    # })
-    
-    groups <- reactive(
-        c(input$group1, input$group2)
-    )
-    
-    test_df <- reactive({
+    test_df <- eventReactive(input$go, {
         
         req(input$demographics2)
         
         deaths_filtered() %>%
-            rename(var = !!sym(input$demographics2)) %>%
-            filter(var %in% groups()) %>%
-            select(var, Deaths)
+            rename(groups = !!sym(input$demographics2)) %>%
+            filter(groups %in% c(input$group1, input$group2)) %>%
+            select(groups, Deaths)
     })
     
-     # # -- density plot for groups 1 and 2
+    dens1 <- eventReactive(input$go, {
+        density(x = test_df() %>% filter(groups == input$group1) %>% pull(Deaths))
+    })
+    
+    dens2 <- eventReactive(input$go, {
+        density(x = test_df() %>% filter(groups == input$group2) %>% pull(Deaths))
+    })
+    
+    # # -- density plot for groups 1 and 2
     output$densities <- renderPlotly({
         
-        req(dens1())
-        req(dens2())
-
-        dens1 <- density(x = test_df() %>% filter(var == groups()[1]) %>% pull(Deaths))
-        dens2 <- density(x = test_df() %>% filter(var == groups()[2]) %>% pull(Deaths))
-        
         plot_ly(
-            x = ~dens1$x,
-            y = ~dens1$y,
+            x = ~dens1()$x,
+            y = ~dens1()$y,
             type = 'scatter',
             mode = 'none',
-            name = groups()[1],
+            name = isolate(input$group1),
             fill = 'tozeroy',
             fillcolor = "rgb(116, 0, 184, 0.1)",
         ) %>%
             add_trace(
-                x = ~dens2$x,
-                y = ~dens2$y,
-                name = groups()[2],
+                x = ~dens2()$x,
+                y = ~dens2()$y,
+                name = isolate(input$group2),
                 fill = 'tozeroy',
                 fillcolor =  my_pal[10],
                 opacity = .5
@@ -719,18 +716,54 @@ server <- function(input, output, session){
                 margin = list(l = 10, r = 10, t = 10, b = 10),
                 plot_bgcolor  = "rgba(0, 0, 0, 0)",
                 paper_bgcolor = "rgba(0, 0, 0, 0)",
-                font = list(color = '#FFFFFF', size = 10)
+                font = list(color = '#FFFFFF', size = 10),
+                legend = list(x = 0.75, y = 0.99)
             )
     })
-
-    # results <- reactive({
-    #     t.test(
-    #         Deaths ~ var, 
-    #         data = test_df(), 
-    #         alternative = test_opts()$type, 
-    #         conf.level = test_opts()$confidence
-    #     )
-    # })
+    
+    output$statistics <- renderDT(
+        datatable(
+            test_df() %>% 
+                group_by(groups) %>% 
+                summarise_if(.predicate = is.numeric, 
+                             .funs = list(
+                                 N = length, 
+                                 mean = mean, 
+                                 var = var, 
+                                 median = median
+                             )
+                ) %>% 
+                mutate(groups = isolate(c(input$group1, input$group2)),
+                       StDev = sqrt(var)) %>% 
+                select(groups, N, mean, median, var, StDev),
+            options = list(dom = 't')
+        ) %>% formatRound(columns = c(3:6), digits = 0)
+    )
+    
+    results <- eventReactive(input$go, {
+        
+        test_df() %>% 
+            group_by(groups) %>%
+            do(tidy(
+                t.test(x = test_df()$Deaths,
+                       alternative = input$test_type, 
+                       conf.level = (1 - input$alpha))
+            )) %>% 
+            ungroup() %>% 
+            select(estimate:conf.high) %>% 
+            distinct() %>% 
+            gather(key = "", value = "result")
+        
+    })
+    
+    output$test_results <- renderDT(
+        datatable(
+            data = results(),
+            options = list(dom = 't'),
+            caption = "Test results", 
+            rownames = FALSE,
+        ) %>% formatRound(columns = "result", digits = 2)
+    )
 }
 
 shinyApp(ui = ui, server = server)
