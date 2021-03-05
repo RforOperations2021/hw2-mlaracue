@@ -10,12 +10,13 @@ library("tidyr")
 library("dplyr")
 library("stringr")
 library("broom")
-library("latex2exp")
 
 # for plotting
 library("ggplot2")
 library("plotly")
 library("scales")
+
+options(warn=-1)
 
 my_pal <- c("#7400b8", "#6930c3", "#5e60ce", "#5390d9", "#4ea8de",
             "#48bfe3", "#56cfe1", "#64dfdf", "#72efdd", "#80ffdb")
@@ -68,32 +69,7 @@ header <- dashboardHeader(
 
 sidebar <- dashboardSidebar(
     
-    # the app has three main pages: EDA, hypothesis testing and forecasting
-    sidebarMenu(
-        id = "mymenu",
-        
-        menuItem(
-            "Exploratory Data Analysis", 
-            tabName = "EDA", 
-            icon = icon("chart-bar")
-        ),
-        menuItem(
-            "Hypothesis testing", 
-            tabName = "testing", 
-            icon = icon("vials"), 
-            badgeLabel = "new", 
-            badgeColor = "green"
-        ),
-        
-        menuItem(
-            "Forecasting", 
-            tabName = "forecasting", 
-            icon = icon("diagnoses")
-        )
-    ),
-    
-    hr(),
-    
+    # --- dashboard global filter; has an effect on all modules/pages
     selectInput(
         inputId = "cause",
         label = "Select a leading cause:",
@@ -101,18 +77,27 @@ sidebar <- dashboardSidebar(
         selected = 'All',
         multiple = FALSE, 
         width = '400px'
-    )
+    ),
     
+    hr(),
+    
+    # --- the app has three main pages: EDA, hypothesis testing and forecasting
+    # the forecasting page is only available when input$cause == "All"
+    # so the sidebarMenu is created as a reactive object
+    
+    sidebarMenuOutput(
+        outputId = "mymenu"
+    )
 )
 
+# --- the three components/items of the module are also separated for readability
 EDA <- tabItem(
     tabName = "EDA",
     
     h2("Exploratory Data Analysis"),
     
-    # first row
+    # -- first row
     fluidRow(
-        # this column includes the global filter for the page (leading case) and a pie-chart
         column(
             width = 3,
             
@@ -164,10 +149,6 @@ EDA <- tabItem(
                     ),
                     color = "purple"
                 )
-                # for dynamic info boxes (not working!)
-                # infoBoxOutput(outputId = "total_deaths")
-                # infoBoxOutput(outputId = "average_deaths"),
-                # infoBoxOutput(outputId = "average_rate")
             ),
             
             tabBox(
@@ -192,7 +173,7 @@ EDA <- tabItem(
         )
     ),
     
-    # second row
+    # -- second row
     fluidRow(
         column(
             width = 8,
@@ -297,9 +278,7 @@ hypothesis_testing <- tabItem(
         
         column(
             width = 8,
-            
-            
-            
+
             fluidRow(
                 # -- auxiliary tables: test results
                 column(
@@ -349,6 +328,57 @@ body <- dashboardBody(
 ui <- dashboardPage(header, sidebar, body)
 
 server <- function(input, output, session){
+    
+    observeEvent(input$cause, {
+        
+        if(input$cause == "All"){
+            
+            output$mymenu <- renderMenu(
+                
+                sidebarMenu(
+                    
+                    menuItem(
+                        "Exploratory Data Analysis", 
+                        tabName = "EDA", 
+                        icon = icon("chart-bar")
+                    ),
+                    menuItem(
+                        "Hypothesis testing", 
+                        tabName = "testing", 
+                        icon = icon("vials"), 
+                        badgeLabel = "new", 
+                        badgeColor = "green"
+                    ),
+                    
+                    menuItem(
+                        "Forecasting",
+                        tabName = "forecasting",
+                        icon = icon("diagnoses")
+                    )
+                )
+            )
+        } else {
+            
+            output$mymenu <- renderMenu(
+                
+                sidebarMenu(
+                    
+                    menuItem(
+                        "Exploratory Data Analysis", 
+                        tabName = "EDA", 
+                        icon = icon("chart-bar")
+                    ),
+                    menuItem(
+                        "Hypothesis testing", 
+                        tabName = "testing", 
+                        icon = icon("vials"), 
+                        badgeLabel = "new", 
+                        badgeColor = "green"
+                    )
+                )
+            )
+        }
+    })
     
     # --- EDA module ---
     axis_template <- list(
