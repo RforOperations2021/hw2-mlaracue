@@ -626,8 +626,13 @@ server <- function(input, output, session){
     
     # -- dynamic choices for group 1 and 2
     dem_choices <- reactive({
+        
         req(input$demographics2)
-        deaths %>%pull(!!sym(input$demographics2)) %>% unique() %>% sort()
+        deaths_filtered() %>% 
+            count(!!sym(input$demographics2)) %>% 
+            filter(n >= 10) %>% 
+            pull(!!sym(input$demographics2)) %>% 
+            sort()
     })
     
     output$group1 <- renderUI(
@@ -672,28 +677,29 @@ server <- function(input, output, session){
     groups <- reactive(
         c(input$group1, input$group2)
     )
-
+    
     test_df <- reactive({
+        
         req(input$demographics2)
+        
         deaths_filtered() %>%
             rename(var = !!sym(input$demographics2)) %>%
             filter(var %in% groups()) %>%
             select(var, Deaths)
     })
     
-    # # -- density plot for groups 1 and 2
+     # # -- density plot for groups 1 and 2
     output$densities <- renderPlotly({
         
-        one <- test_df()[which(test_df()$var == groups()[1]),]
-        # use of isolate to avoid dependency on inputs so no errors are shown
-        density1 <- isolate(density(one$Deaths)) 
+        req(dens1())
+        req(dens2())
 
-        two <- test_df()[which(test_df()$var == groups()[2]),]
-        density2 <- isolate(density(two$Deaths))
-
+        dens1 <- density(x = test_df() %>% filter(var == groups()[1]) %>% pull(Deaths))
+        dens2 <- density(x = test_df() %>% filter(var == groups()[2]) %>% pull(Deaths))
+        
         plot_ly(
-            x = ~density1$x,
-            y = ~density1$y,
+            x = ~dens1$x,
+            y = ~dens1$y,
             type = 'scatter',
             mode = 'none',
             name = groups()[1],
@@ -701,8 +707,8 @@ server <- function(input, output, session){
             fillcolor = "rgb(116, 0, 184, 0.1)",
         ) %>%
             add_trace(
-                x = ~density2$x,
-                y = ~density2$y,
+                x = ~dens2$x,
+                y = ~dens2$y,
                 name = groups()[2],
                 fill = 'tozeroy',
                 fillcolor =  my_pal[10],
@@ -716,7 +722,7 @@ server <- function(input, output, session){
                 font = list(color = '#FFFFFF', size = 10)
             )
     })
-    # 
+
     # results <- reactive({
     #     t.test(
     #         Deaths ~ var, 
