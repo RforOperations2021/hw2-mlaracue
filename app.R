@@ -731,26 +731,32 @@ server <- function(input, output, session){
                 plot_bgcolor  = "rgba(0, 0, 0, 0)",
                 paper_bgcolor = "rgba(0, 0, 0, 0)",
                 font = list(color = '#FFFFFF', size = 10),
-                legend = list(x = 0.75, y = 0.99)
+                legend = list(x = 0.65, y = 0.99)
             )
+    })
+    
+    summary_table <- reactive({
+        
+        test_df() %>% 
+            group_by(groups) %>% 
+            summarise_if(.predicate = is.numeric, 
+                         .funs = list(
+                             N = length, 
+                             mean = mean, 
+                             var = var, 
+                             median = median
+                         )
+            ) %>% 
+            mutate(groups = isolate(c(input$group1, input$group2)),
+                   StDev = sqrt(var)) %>% 
+            select(groups, N, mean, median, var, StDev)
     })
     
     output$statistics <- renderDT(
         datatable(
-            test_df() %>% 
-                group_by(groups) %>% 
-                summarise_if(.predicate = is.numeric, 
-                             .funs = list(
-                                 N = length, 
-                                 mean = mean, 
-                                 var = var, 
-                                 median = median
-                             )
-                ) %>% 
-                mutate(groups = isolate(c(input$group1, input$group2)),
-                       StDev = sqrt(var)) %>% 
-                select(groups, N, mean, median, var, StDev),
-            options = list(dom = 't')
+            data = summary_table(),
+            options = list(dom = 't'),
+            caption = "Summary statistics"
         ) %>% formatRound(columns = c(3:6), digits = 0)
     )
     
