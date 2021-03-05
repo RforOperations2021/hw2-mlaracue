@@ -11,6 +11,7 @@ library("tidyr")
 library("dplyr")
 library("stringr")
 library("broom")
+library("comprehenr")
 
 # for plotting
 library("ggplot2")
