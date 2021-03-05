@@ -60,6 +60,8 @@ leading_causes <- deaths %>%
     mutate(wt = n / sum(n)) %>% 
     filter(n > quantile(n, probs = .5))
 
+ethnicities <- deaths$Ethnicity %>% unique() %>% sort()
+
 # --- split the components expected by the app for readability
 
 header <- dashboardHeader(
@@ -310,11 +312,58 @@ hypothesis_testing <- tabItem(
     )
 )
 
-
 forecasting <- tabItem(
     tabName = "forecasting",
     
-    h2("Forecasting")
+    h2("Forecasting"),
+    
+    fluidRow(
+        column(
+            width = 3,
+            
+            box(
+                width = 12,
+                
+                h4("Population 1:"),
+                
+                hr(),
+                
+                radioButtons(
+                    inputId = "sex", 
+                    label = "Which sex?", 
+                    choices = c("Female", "Male"), 
+                    selected = "Female", 
+                    inline = TRUE
+                ),
+                
+                selectInput(
+                    inputId = "ethnicity", 
+                    label = "Which ethnicity?", 
+                    choices = ethnicities
+                ),
+                
+                br(),
+                
+                h4("Population 2:"),
+                
+                hr(),
+                
+                radioButtons(
+                    inputId = "sex2", 
+                    label = "Which sex?", 
+                    choices = c("Female", "Male"), 
+                    selected = "Female", 
+                    inline = TRUE
+                ),
+                
+                selectInput(
+                    inputId = "ethnicity2", 
+                    label = "Which ethnicity?", 
+                    choices = ethnicities
+                ),
+            )
+        )
+    )
 )
 
 body <- dashboardBody(
@@ -329,6 +378,8 @@ ui <- dashboardPage(header, sidebar, body)
 
 server <- function(input, output, session){
     
+    # -- sidebarMenu ---
+    # when input$cause is different than "All", the forecasting tab is hidden
     observeEvent(input$cause, {
         
         if(input$cause == "All"){
@@ -342,6 +393,7 @@ server <- function(input, output, session){
                         tabName = "EDA", 
                         icon = icon("chart-bar")
                     ),
+                    
                     menuItem(
                         "Hypothesis testing", 
                         tabName = "testing", 
@@ -357,6 +409,7 @@ server <- function(input, output, session){
                     )
                 )
             )
+            
         } else {
             
             output$mymenu <- renderMenu(
@@ -368,6 +421,7 @@ server <- function(input, output, session){
                         tabName = "EDA", 
                         icon = icon("chart-bar")
                     ),
+                    
                     menuItem(
                         "Hypothesis testing", 
                         tabName = "testing", 
