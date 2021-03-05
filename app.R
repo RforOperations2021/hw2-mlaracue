@@ -3,6 +3,7 @@ library("shiny")
 library("shinydashboard")
 library("dashboardthemes")
 library("DT")
+library("shinyjs")
 
 # for data loading and transformation
 library("readr")
@@ -20,6 +21,8 @@ options(warn=-1)
 
 my_pal <- c("#7400b8", "#6930c3", "#5e60ce", "#5390d9", "#4ea8de",
             "#48bfe3", "#56cfe1", "#64dfdf", "#72efdd", "#80ffdb")
+
+info <- readLines(con = "about.txt")
 
 # --- data loading
 deaths <- read_csv(
@@ -83,8 +86,8 @@ sidebar <- dashboardSidebar(
     
     hr(),
     
-    # --- the app has three main pages: EDA, hypothesis testing and forecasting
-    # the forecasting page is only available when input$cause == "All"
+    # --- the app has three main pages: EDA, hypothesis testing and probabilities
+    # the probability page is only available when input$cause == "All"
     # so the sidebarMenu is created as a reactive object
     
     sidebarMenuOutput(
@@ -138,7 +141,7 @@ EDA <- tabItem(
                         class = "fas fa-balance-scale", 
                         style = "font-size: 40px; color: white; position:relative; right:25px;"
                     ),
-                    color = "purple"
+                    color = "aqua"
                 ),
                 
                 valueBox(
@@ -149,7 +152,7 @@ EDA <- tabItem(
                         class = "fas fa-percentage", 
                         style = "font-size: 40px; color: white; position:relative; right:25px;"
                     ),
-                    color = "purple"
+                    color = "light-blue"
                 )
             ),
             
@@ -178,7 +181,7 @@ EDA <- tabItem(
     # -- second row
     fluidRow(
         column(
-            width = 8,
+            width = 9,
             
             tabBox(
                 width = 12,
@@ -212,7 +215,7 @@ EDA <- tabItem(
         ),
         
         column(
-            width = 4,
+            width = 3,
             box(
                 title = "Average Deaths Rates by Year and Sex",
                 width = 12,
@@ -280,7 +283,7 @@ hypothesis_testing <- tabItem(
         
         column(
             width = 8,
-
+            
             fluidRow(
                 # -- auxiliary tables: test results
                 column(
@@ -312,10 +315,10 @@ hypothesis_testing <- tabItem(
     )
 )
 
-forecasting <- tabItem(
-    tabName = "forecasting",
+probability <- tabItem(
+    tabName = "probability",
     
-    h2("Forecasting"),
+    h2("Expected Incidence"),
     
     fluidRow(
         column(
@@ -352,7 +355,7 @@ forecasting <- tabItem(
                     inputId = "sex2", 
                     label = "Which sex?", 
                     choices = c("Female", "Male"), 
-                    selected = "Female", 
+                    selected = "Male", 
                     inline = TRUE
                 ),
                 
@@ -362,8 +365,20 @@ forecasting <- tabItem(
                     choices = ethnicities
                 ),
             )
+        ),
+        
+        column(
+            width = 9,
+            
+            plotlyOutput(outputId = "probs")
         )
     )
+)
+
+about <- tabItem(
+    tabName = "about",
+    
+    HTML(text = info)
 )
 
 body <- dashboardBody(
@@ -371,7 +386,7 @@ body <- dashboardBody(
         theme = "purple_gradient"
     ),
     
-    tabItems(EDA, hypothesis_testing, forecasting)
+    tabItems(EDA, hypothesis_testing, probability, about)
 )
 
 ui <- dashboardPage(header, sidebar, body)
@@ -379,7 +394,7 @@ ui <- dashboardPage(header, sidebar, body)
 server <- function(input, output, session){
     
     # -- sidebarMenu ---
-    # when input$cause is different than "All", the forecasting tab is hidden
+    # when input$cause is different than "All", the probability tab is hidden
     observeEvent(input$cause, {
         
         if(input$cause == "All"){
@@ -403,9 +418,15 @@ server <- function(input, output, session){
                     ),
                     
                     menuItem(
-                        "Forecasting",
-                        tabName = "forecasting",
-                        icon = icon("diagnoses")
+                        "Expected Incidence",
+                        tabName = "probability",
+                        icon = icon("dice")
+                    ),
+                    
+                    menuItem(
+                        "About",
+                        tabName = "about",
+                        icon = icon("heart")
                     )
                 )
             )
@@ -428,6 +449,12 @@ server <- function(input, output, session){
                         icon = icon("vials"), 
                         badgeLabel = "new", 
                         badgeColor = "green"
+                    ),
+                    
+                    menuItem(
+                        "About",
+                        tabName = "about",
+                        icon = icon("heart")
                     )
                 )
             )
@@ -567,7 +594,8 @@ server <- function(input, output, session){
     
     output$table1 <- renderDT(
         total_deaths_df(),
-        options = list(pageLength = 4, dom = 'ftip')
+        options = list(pageLength = 4, dom = 'ftip'),
+        rownames = FALSE
     )
     
     women_men_ratio_df <- reactive({
@@ -620,14 +648,15 @@ server <- function(input, output, session){
                 plot_bgcolor  = "rgba(0, 0, 0, 0)",
                 paper_bgcolor = "rgba(0, 0, 0, 0)",
                 font = list(color = '#FFFFFF', size = 10),
-                legend = list(x = 0.8, y = 0.05),
+                # legend = list(x = 0.8, y = 0.05),
                 xaxis = list(showgrid = F)
             )
     )
     
     output$table2 <- renderDT(
         women_men_ratio_df() %>% mutate(ratio = round(ratio, 2)),
-        options = list(pageLength = 4, dom = 'ftip')
+        options = list(pageLength = 3, dom = 'ftip'),
+        rownames = FALSE
     )
     
     output$boxplot1 <- renderPlotly({
@@ -727,6 +756,16 @@ server <- function(input, output, session){
     
     # --- Hypothesis Testing module ---
     
+    observeEvent(input$go, {
+        
+        showNotification(
+            ui = "Hypothesis testing performed based on inputs", 
+            duration = NULL,
+            type = "message"
+        )
+        
+    })
+    
     # -- dynamic choices for group 1 and 2
     dem_choices <- reactive({
         
@@ -771,6 +810,7 @@ server <- function(input, output, session){
         }
     })
     
+    # -- this df is created to use in the T-Student's Test
     test_df <- eventReactive(input$go, {
         
         req(input$demographics2)
@@ -781,6 +821,8 @@ server <- function(input, output, session){
             select(groups, Deaths)
     })
     
+    # -- densities x and y values for plot 
+    # they were creates as reactive values to avoid errors between user's selections
     dens1 <- eventReactive(input$go, {
         density(x = test_df() %>% filter(groups == input$group1) %>% pull(Deaths))
     })
@@ -789,7 +831,7 @@ server <- function(input, output, session){
         density(x = test_df() %>% filter(groups == input$group2) %>% pull(Deaths))
     })
     
-    # # -- density plot for groups 1 and 2
+    # -- density plot for groups 1 and 2
     output$densities <- renderPlotly({
         
         plot_ly(
@@ -819,6 +861,7 @@ server <- function(input, output, session){
             )
     })
     
+    # -- a summary table displaying some fundamental statistics
     summary_table <- reactive({
         
         test_df() %>% 
@@ -844,6 +887,7 @@ server <- function(input, output, session){
         ) %>% formatRound(columns = c(3:6), digits = 0)
     )
     
+    # -- a summary table displaying the test results
     results <- eventReactive(input$go, {
         
         test_df() %>% 
@@ -870,6 +914,7 @@ server <- function(input, output, session){
         ) %>% formatRound(columns = "estimates", digits = 2)
     )
     
+    # -- the decision based on the p-value (reject or fail to reject)
     output$decision <- renderText({
         
         if(results() %>% filter(var == "p.value") %>% pull(estimates) <= input$alpha) {
@@ -881,6 +926,77 @@ server <- function(input, output, session){
         }
         
     })
+    
+    # --- Expected incidence module ---
+    
+    # -- df created based on user inputs
+    # the death proportions are calculated and then I take the mean and sd for plotting
+    probs_df <- reactive({
+        
+        total_deaths <- deaths %>% 
+            group_by(LeadingCause, Year) %>% 
+            summarise(Total = sum(Deaths),
+                      .groups = "drop")
+        
+        deaths %>%
+            mutate(
+                aux = case_when(
+                    Sex == input$sex & Ethnicity == input$ethnicity ~ 1,
+                    TRUE ~ 0),
+                pop = case_when(
+                    Sex == input$sex2 & Ethnicity == input$ethnicity2 ~ 2,
+                    TRUE ~ aux)
+            ) %>% 
+            filter(pop != 0) %>% 
+            group_by(LeadingCause, Year, pop) %>% 
+            summarise(Deaths = sum(Deaths),
+                      .groups = "drop") %>% 
+            left_join(total_deaths, by = c("LeadingCause", "Year")) %>% 
+            rowwise() %>% 
+            mutate(proportion = Deaths / Total,
+                   LeadingCause = paste(strwrap(LeadingCause, width = 20), collapse = "<br>")) %>% 
+            group_by(LeadingCause, pop) %>% 
+            summarise(mean = mean(proportion),
+                      sd = sqrt(var(proportion)),
+                      .groups = "drop") %>% 
+            filter(!is.na(sd))
+        
+    })
+    
+    # -- Error bar chart for the two populations
+    output$probs <- renderPlotly({
+        
+        plot_ly(
+            data = probs_df() %>% filter(pop == 1),
+            x = ~LeadingCause, 
+            y = ~mean, 
+            type = 'scatter', 
+            mode = 'lines+markers',
+            name = paste(input$sex, "&", input$ethnicity),
+            marker = list(color = "#e0aaff", size = 10),
+            line = list(color = "e0aaff"),
+            height = 500,
+            error_y = ~list(
+                array = sd,
+                color = '#FFFFFF')
+        ) %>% 
+            add_trace(
+                data = probs_df() %>% filter(pop == 2),
+                name = paste(input$sex2, "&", input$ethnicity2),
+                marker = list(color = my_pal[10], size = 10),
+                line = list(color = my_pal[10])
+            ) %>% 
+            layout(
+                xaxis = list(showgrid = FALSE),
+                yaxis = list(title = 'Expected Incidence'),
+                margin = list(l = 10, r = 10, t = 10, b = 10),
+                plot_bgcolor  = "rgba(0, 0, 0, 0)",
+                paper_bgcolor = "rgba(0, 0, 0, 0)",
+                font = list(color = '#FFFFFF', size = 10),
+                legend = list(x = 0.01, y = 0.99)
+            )
+    })
+    
 }
 
 shinyApp(ui = ui, server = server)

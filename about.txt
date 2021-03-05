@@ -1,0 +1,26 @@
+<h2>About</h2>
+<p>This dashboard aims to analyze the leading causes of death by <em>sex</em> and <em>ethnicity</em> in New York City since 2007. The cause of death is derived from the NYC death certificate issued for every death that occurs in New York City.</p>
+<p>At the bottom-left, users can use a global filter to select a subset of the data and analyze the results for a particular death leading cause.</p>
+<p>The dashboard comprises three main pages: Exploratory Data Analysis -EDA-, Hypothesis Testing (a feature recently included), and Expected Incidence. Find the description below:</p>
+<h3>EDA</h3>
+<p>The EDA module allows the user to see, at a glance, the main relationships between the demographic variables.</p>
+<ul>
+<li>At the beginning of the page, users can see a pie chart that conveys the total number of deaths by each cause. For example, the user can see that historically the higher number of deaths has been caused by heart diseases.</li>
+<li>On the top-right, three static values are shown: the total number of deaths from 2007 to 2017,&nbsp; the average number of deaths by year, and the average death rate.</li>
+<li>Below the three boxes, users can see a bar chart displaying the total number of deaths for each year for the aggregate (All), by sex or by ethnicity. Additionally, for some charts, a "Data" option is displayed if the user wants to see the data used for plotting.</li>
+<li>The bubble chart aims to analyze the female/male deaths ratio by year and ethnicity. A table is also displayed.</li>
+<li>At the bottom of the page, users can see the distribution of deaths by sex and ethnicity.</li>
+<li>Finally, on the bottom-right, the average death rates by year and sex are displayed.</li>
+</ul>
+<h3>Hypothesis Testing</h3>
+<p>This module intends to perform a Student's Test on the available data. Users can select the demographic variable (sex or ethnicity), the comparison groups (i.e., category levels for the selected variable), the significance level of the test (default is .05), and the type of test (two-tails or one-tail). Once all the options are selected, users need to click on the "Analyze" button, and three outputs are displayed.&nbsp;</p>
+<ol>
+<li>A summary table with test results and the decision based on the p-value.</li>
+<li>A density plot showing the distribution differences between the selected groups.</li>
+<li>A statistics summary table displaying the sample means and other useful information.&nbsp;</li>
+</ol>
+<h3>Expected Incidence</h3>
+<p>The last module shows the expected death proportion for the populations selected (composed of intersections of sex and ethnicity). The plot shows the leading causes on the x-axis and the expected incidence on the y-axis. The dots represent the sample means, and the vertical lines represent the respective confidence intervals for the sample means.&nbsp;</p>
+<p>Note: This module is available only if the users select "All" in the global filter. Otherwise, it's hidden.</p>
+<p>The source data can be found in <a href="https://data.cityofnewyork.us/Health/New-York-City-Leading-Causes-of-Death/jb7j-dtam">NYC OpenData</a>.</p>
+<p>Enjoy!</p>
