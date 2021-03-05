@@ -10,6 +10,7 @@ library("tidyr")
 library("dplyr")
 library("stringr")
 library("broom")
+library("latex2exp")
 
 # for plotting
 library("ggplot2")
@@ -250,7 +251,7 @@ hypothesis_testing <- tabItem(
             box(
                 width = 12,
                 
-                h4("Demograhpics"),
+                h4("Demographics"),
                 
                 br(),
                 
@@ -297,26 +298,39 @@ hypothesis_testing <- tabItem(
         column(
             width = 8,
             
-            # -- main plot (i.e., density distributions)
-            fluidRow(
-                
-                box(
-                    width = 12,
-                    title = "Distribution Differences", 
-                    status = "primary",
-                    
-                    plotlyOutput(outputId = "densities")
-                )
-            ),
             
-            # -- auxiliary tables (summary statistics and test results)
+            
             fluidRow(
-                column(width = 8, DTOutput(outputId = "statistics")),
-                column(width = 4, DTOutput(outputId = "test_results"))
+                # -- auxiliary tables: test results
+                column(
+                    width = 4, 
+                    DTOutput(outputId = "test_results"),
+                    br(),
+                    
+                    h4("Decision:"),
+                    textOutput("decision")
+                ),
+                
+                column(
+                    width = 8, 
+                    
+                    # -- main plot (i.e., density distributions)
+                    box(
+                        width = 12,
+                        title = "Distribution Differences", 
+                        status = "primary",
+                        
+                        plotlyOutput(outputId = "densities")
+                    ),
+                    
+                    # -- auxiliary tables: summary statistics
+                    DTOutput(outputId = "statistics")
+                )
             )
         )
     )
 )
+
 
 forecasting <- tabItem(
     tabName = "forecasting",
@@ -752,18 +766,31 @@ server <- function(input, output, session){
             ungroup() %>% 
             select(estimate:conf.high) %>% 
             distinct() %>% 
-            gather(key = "", value = "result")
+            gather(key = "var", value = "estimates")
         
     })
     
     output$test_results <- renderDT(
         datatable(
             data = results(),
+            colnames = c("", "results"),
             options = list(dom = 't'),
             caption = "Test results", 
             rownames = FALSE,
-        ) %>% formatRound(columns = "result", digits = 2)
+        ) %>% formatRound(columns = "estimates", digits = 2)
     )
+    
+    output$decision <- renderText({
+        
+        if(results() %>% filter(var == "p.value") %>% pull(estimates) <= input$alpha) {
+            
+            paste("Reject the null at alpha =", input$alpha) 
+            
+        } else {
+            paste("Fail to reject the null at alpha =", input$alpha) 
+        }
+        
+    })
 }
 
 shinyApp(ui = ui, server = server)
