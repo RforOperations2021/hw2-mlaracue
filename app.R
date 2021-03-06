@@ -85,6 +85,8 @@ sidebar <- dashboardSidebar(
         width = '400px'
     ),
     
+    HTML("<small>Note: Third panel available only for 'All' leading causes</small>"),
+    
     hr(),
     
     # --- the app has three main pages: EDA, hypothesis testing and probabilities
@@ -262,7 +264,7 @@ hypothesis_testing <- tabItem(
                 
                 numericInput(
                     inputId = "alpha", 
-                    label = "Significance level:", 
+                    label = "Significance level [0, 0.1]:", 
                     value = .05,
                     min = 0,
                     max = 0.1, 
@@ -757,16 +759,6 @@ server <- function(input, output, session){
     
     # --- Hypothesis Testing module ---
     
-    observeEvent(input$go, {
-        
-        showNotification(
-            ui = "Hypothesis testing performed based on inputs", 
-            duration = NULL,
-            type = "message"
-        )
-        
-    })
-    
     # -- dynamic choices for group 1 and 2
     dem_choices <- reactive({
         
@@ -807,6 +799,11 @@ server <- function(input, output, session){
                 session = session,
                 inputId = "alpha",
                 value = 0.1
+            )
+            
+            showNotification(
+                ui = "Significance level (i.e., alpha) must be between 0 and 0.1", 
+                type = "error"
             )
         }
     })
