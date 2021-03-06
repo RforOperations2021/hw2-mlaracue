@@ -12,6 +12,8 @@ The dashboard comprises three main pages: Exploratory Data Analysis -EDA-, Hypot
 
 ### EDA
 
+![EDA](https://raw.githubusercontent.com/RforOperations2021/hw2-mlaracue/main/EDA.png)
+
 The EDA module allows the user to see, at a glance, the main relationships between the demographic variables.
 
 -   At the beginning of the page, users can see a pie chart that conveys the total number of deaths by each cause. For example, the user can see that historically the higher number of deaths has been caused by heart diseases.
@@ -23,6 +25,8 @@ The EDA module allows the user to see, at a glance, the main relationships betwe
 
 ### Hypothesis Testing
 
+![testing](https://raw.githubusercontent.com/RforOperations2021/hw2-mlaracue/main/testing.png)
+
 This module intends to perform a Student's Test on the available data. Users can select the demographic variable (sex or ethnicity), the comparison groups (i.e., category levels for the selected variable), the significance level of the test (default is .05), and the type of test (two-tails or one-tail). Once all the options are selected, users need to click on the "Analyze" button, and three outputs are displayed.
 
 1.  A summary table with test results and the decision based on the p-value.
@@ -30,6 +34,8 @@ This module intends to perform a Student's Test on the available data. Users can
 3.  A statistics summary table displaying the sample means and other useful information.
 
 ### Expected Incidence
+
+![incidence](https://raw.githubusercontent.com/RforOperations2021/hw2-mlaracue/main/incidence.png)
 
 The last module shows the expected death proportion for the populations selected (composed of intersections of sex and ethnicity). The plot shows the leading causes on the x-axis and the expected incidence on the y-axis. The dots represent the sample means, and the vertical lines represent the respective confidence intervals for the sample means.
 
